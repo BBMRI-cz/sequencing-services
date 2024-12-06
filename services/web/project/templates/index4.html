@@ -1,0 +1,16 @@
+
+{% extends "layout.html" %}
+{% block content %}
+<h2>Retrieving sequencing data from SC</h2>
+<p>Predictive number: {{data.pred_num}} -> Pseudonym: {{data.pseudonym}}</p>
+<p>File found in:</p>
+<p>{{data.path}}</p>
+<h2>Download only patient sample:</h2>
+<form method="POST" action="/transfering_file_sample">
+  <input type="submit" name="sample" value="Single Sample">
+</form>
+<h2>Download whole run:</h2>
+<form method="POST" action="/transfering_file_run">
+  <input type="submit" name="run" value="Whole Run">
+</form>
+{% endblock content %}

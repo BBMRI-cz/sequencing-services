@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  web:
+    image: seq-flask-test
+    command: python manage.py run -h 0.0.0.0
+    volumes:
+      - ./services/web/:/usr/src/app/
+      - ../pseudo_tables/:/pseudo_tables/
+    ports:
+      - 8081:5000
+    env_file:
+      - ./.env.dev
+    depends_on:
+      - db
+  db:
+    image: postgres:13
+    volumes:
+      - seq_postgres_data:/var/lib/postgesql/data
+    environment:
+      - POSTGRES_USER=hello_flask
+      - POSTGRES_PASSWORD=hello_flask
+      - POSTGRES_DB=hello_flask_dev
+
+volumes:
+  seq_postgres_data:

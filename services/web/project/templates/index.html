@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Uploading & Reading CSV file</h2>
+<form method = "POST" enctype="multipart/form-data" action = "/bbm-sequencing-upload"> 
+	<input type="file" name="file" />
+	<input type="submit" name="upload" value="Upload"/> 
+</form>
+<p style="color:blue;">Choose csv or xlsx file to upload</p>
+<form action="/bbm-sequencing-download" target="_blank">
+	<input type="submit" value="Download CSV" disabled/>
+</form>
+{% endblock content %}

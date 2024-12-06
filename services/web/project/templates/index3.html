@@ -1,0 +1,9 @@
+
+{% extends "layout.html" %}
+{% block content %}
+   <h2>Retrieving sequencing data from SC</h2>
+    <form method="POST" action="/pathology-data-retrieval">
+      <input type="text" name="pred_number" placeholder="predictive number">
+      <input type="submit" name="pred_submit" value="Search">
+    </form>
+{% endblock content %}

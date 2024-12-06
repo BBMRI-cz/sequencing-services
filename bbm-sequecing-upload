@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html> 
+<head> 
+	<title>Uploading & Reading CSV file</title> 
+</head> 
+<body> 
+	<form method = "POST" enctype="multipart/form-data" action = "/bbm-sequecing-upload"> 
+		<input type="file" name="file">
+		<input type="submit" value="Upload"> 
+	</form>
+	<p style="color:blue;">Choose csv or xlsx file to upload</p>
+<form action="/bbm-sequecing-download" target="_blank">
+		<input type="submit" value="Download CSV" disabled/>
+	</form>
+</body> 
+</html>
