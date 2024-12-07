@@ -2,11 +2,13 @@ version: '3.8'
 
 services:
   web:
-    image: seq-flask-test
+    build:
+      context: ./services/web
+      dockerfile: Dockerfile
     command: python manage.py run -h 0.0.0.0
     volumes:
       - ./services/web/:/usr/src/app/
-      - ../pseudo_tables/:/pseudo_tables/
+      - /home/houfek/Work/MMCI/sequencing_pipeline/data-catalogue-playground/pseudonymisation_table/:/pseudo_tables/
     ports:
       - 8081:5000
     env_file:
