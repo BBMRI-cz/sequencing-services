@@ -113,21 +113,32 @@ def _look_if_pred_number_has_data(wanted_pred_number, db):
 
 
 def find_file(file_we_look_for, path, year):
-    if year.startswith("20"):
-        existing_sequence_types = [folder_sequence_type for folder_sequence_type
-                                   in os.listdir(os.path.join(path, year))
-                                   if os.path.exists(os.path.join(path, year, folder_sequence_type))]
+    full_year = f"20{year}"
+    full_year_path = os.path.join(path, full_year)
+    if not os.path.exists(full_year_path):
+        return None
 
-        for sequence_type in existing_sequence_types:
-            if sequence_type == "MiSEQ":
-                run_type = os.path.join("MiSEQ", "complete-runs")
-            else:
-                run_type = "NextSeq"
-            if os.path.exists(os.path.join(path, year, run_type)):
-                for run in os.listdir(os.path.join(path, year, run_type)):
-                    for sample in os.listdir(os.path.join(path, year, run_type, run, "Samples")):
+    existing_sequence_types = [folder_sequence_type for folder_sequence_type
+                               in os.listdir(full_year_path)
+                               if os.path.exists(os.path.join(path, year, folder_sequence_type))]
+
+    for sequence_type in existing_sequence_types:
+        match sequence_type:
+            case "MiSEQ":
+                run_type_dir = os.path.join(full_year_path, "MiSEQ", "complete-runs")
+            case "NextSeq":
+                run_type_dir = os.path.join(full_year_path, "NextSeq")
+            case _:
+                continue  # Skip any sequence_type that is not MiSEQ or NextSeq
+
+        if os.path.exists(run_type_dir):
+            for run in os.listdir(run_type_dir):
+                sample_dir = os.path.join(run_type_dir, run, "Samples")
+                if os.path.exists(sample_dir):
+                    for sample in os.listdir(sample_dir):
                         if sample == file_we_look_for:
-                            return os.path.join(path, year, run_type, run, "Samples", sample)
+                            return os.path.join(sample_dir, sample)
+
     return None
 
 
