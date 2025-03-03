@@ -29,3 +29,5 @@ docker-compose exec web python manage.py fill_db
 ```commandline
 docker-compose exec db psql --username=<prod_username> --dbname=<prod_db_name>
 ```
+
+TEST
