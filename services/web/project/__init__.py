@@ -123,7 +123,7 @@ def find_file(file_we_look_for, path, year):
     for sequence_type in existing_sequence_types:
         match sequence_type:
             case "MiSEQ":
-                run_type_dir = os.path.join(full_year_path, "MiSEQ", "complete-runs")
+                run_type_dir = os.path.join(full_year_path, "MiSEQ")
             case "NextSeq":
                 run_type_dir = os.path.join(full_year_path, "NextSeq")
             case _:

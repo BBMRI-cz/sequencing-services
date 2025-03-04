@@ -9,7 +9,7 @@ services:
   volumes:
    - /home/export/pseudonymization_table/:/pseudo_tables/
    - /seq/NO-BACKUP-SPACE/RETRIEVED/:/RETRIEVED/
-   - /muni-ss/OrganisedRuns/:/RUNS/
+   - /muni-ss/OldOrganisedRuns/:/RUNS/
   ports:
    - 8081:5001
   env_file:
