@@ -118,9 +118,7 @@ def find_file(file_we_look_for, path, year):
     if not os.path.exists(full_year_path):
         return None
 
-    existing_sequence_types = [folder_sequence_type for folder_sequence_type
-                               in os.listdir(full_year_path)
-                               if os.path.exists(os.path.join(path, year, folder_sequence_type))]
+    existing_sequence_types = [folder_sequence_type for folder_sequence_type in os.listdir(full_year_path)]
 
     for sequence_type in existing_sequence_types:
         match sequence_type:
