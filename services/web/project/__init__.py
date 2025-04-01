@@ -384,6 +384,7 @@ def post_new_patient():
         existing_data = PatientPseudo.query.filter_by(patient_id=data["patient_ID"]).first()
         if existing_data is None:
             db.session.add(PatientPseudo(patient_id=data["patient_ID"], patient_pseudo_id=data["patient_pseudo_ID"]))
+            db.session.commit()
             return jsonify(isError=False, message="Success", statusCode=200, data=data), 200
         else:
             return jsonify(isError=True, message="Data already in database", statusCode=409, data=data), 409
@@ -399,6 +400,7 @@ def post_new_predictive():
         existing_data = PredictivePseudo.query.filter_by(predictive_id=data["predictive_ID"]).first()
         if existing_data is None:
             db.session.add(PredictivePseudo(predictive_id=data["predictive_ID"], predictive_id_unified=modify_predictive_number(data["predictive_ID"]), predictive_pseudo_id=data["predictive_pseudo_ID"]))
+            db.session.commit()
             return jsonify(isError=False, message="Success", statusCode=200, data=data), 200
         else:
             return jsonify(isError=True, message="Data already in database", statusCode=409, data=data), 409
@@ -414,6 +416,7 @@ def post_new_sample():
         existing_data = SamplePseudo.query.filter_by(sample_id=data["sample_ID"]).first()
         if existing_data is None:
             db.session.add(SamplePseudo(sample_id=data["sample_ID"], sample_pseudo_id=data["sample_pseudo_ID"]))
+            db.session.commit()
             return jsonify(isError=False, message="Success", statusCode=200, data=data), 200
         else:
             return jsonify(isError=True, message="Data already in database", statusCode=409, data=data), 409
