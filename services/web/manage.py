@@ -23,8 +23,6 @@ def _load_data_from_file(file_name, list_name):
     return data_list
 
 
-
-
 @cli.command("fill_db")
 def fill_db():
 

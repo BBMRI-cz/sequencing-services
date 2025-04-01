@@ -87,6 +87,7 @@ class SamplePseudo(db.Model):
             "sample_pseudo_ID": self.sample_pseudo_id
         }
 
+
 def modify_predictive_number(pred_number):
 
     # matching 2022-1234 ([whole_year]-[number])
