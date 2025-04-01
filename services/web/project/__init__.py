@@ -398,7 +398,7 @@ def post_new_predictive():
     if data:
         existing_data = PredictivePseudo.query.filter_by(predictive_id=data["predictive_ID"]).first()
         if existing_data is None:
-            db.session.add(PredictivePseudo(predictive_id=data["predictive_ID"], predictive_id_unified=modify_predictive_number(data["predictive_ID_unified"]), predictive_pseudo_id=data["predictive_pseudo_ID"]))
+            db.session.add(PredictivePseudo(predictive_id=data["predictive_ID"], predictive_id_unified=modify_predictive_number(data["predictive_ID"]), predictive_pseudo_id=data["predictive_pseudo_ID"]))
             return jsonify(isError=False, message="Success", statusCode=200, data=data), 200
         else:
             return jsonify(isError=True, message="Data already in database", statusCode=409, data=data), 409
