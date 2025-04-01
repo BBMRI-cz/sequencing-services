@@ -1,3 +1,5 @@
+import re
+
 from flask import Flask, jsonify, Response, send_from_directory, request, render_template, session
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Enum
@@ -84,6 +86,34 @@ class SamplePseudo(db.Model):
             "sample_ID": self.sample_id,
             "sample_pseudo_ID": self.sample_pseudo_id
         }
+
+def modify_predictive_number(pred_number):
+
+    # matching 2022-1234 ([whole_year]-[number])
+    if re.match(r"^20[1-2][\d]-[\d]{1,4}", pred_number):
+        year, id = pred_number.split("-", 1)
+        return f"{id}-{year[2:]}"
+
+    # matching 22-1234 ([year]-[number]) etc.
+    if re.match(r"^[1-2][\d]\-[\d]{1,4}", pred_number):
+        year, id = pred_number.split("-", 1)
+        return f"{id}-{year}"
+
+    # matching 1245-22 ([number]-[year]) etc.
+    if re.match(r"^[\d]{1,4}\-[1-2][\d]", pred_number):
+        return pred_number
+
+    # matching 22_1234 ([year]_[number]) etc.
+    if re.match(r"^[1-2][\d]_[\d]{1,4}", pred_number):
+        year, id = pred_number.split("_", 1)
+        return f"{id}-{year}"
+
+    # matching 2022_1234 ([whole_year]_[number])
+    if re.match(r"^20[1-2][\d]_[\d]{1,4}", pred_number):
+        year, id = pred_number.split("_", 1)
+        return f"{id}-{year[2:]}"
+
+    return pred_number
 
 
 def _add_sample_id_to_excel(df, type_of_df):
@@ -348,11 +378,11 @@ def downloadData():
 @app.route("/api/patient", methods=["POST"])
 def post_new_patient():
     data = request.json
-    print(data, file=sys.stderr)
+    print(data)
     if data:
         existing_data = PatientPseudo.query.filter_by(patient_id=data["patient_ID"]).first()
         if existing_data is None:
-            # db.session.add(PatientPseudo(patinet_id=data["patient_ID"], patient_pseudo_id=data["patient_pseudo_ID"]))
+            db.session.add(PatientPseudo(patient_id=data["patient_ID"], patient_pseudo_id=data["patient_pseudo_ID"]))
             return jsonify(isError=False, message="Success", statusCode=200, data=data), 200
         else:
             return jsonify(isError=True, message="Data already in database", statusCode=409, data=data), 409
@@ -363,12 +393,11 @@ def post_new_patient():
 @app.route("/api/predictive", methods=["POST"])
 def post_new_predictive():
     data = request.json
-    print(data, file=sys.stderr)
+    print(data)
     if data:
         existing_data = PredictivePseudo.query.filter_by(predictive_id=data["predictive_ID"]).first()
         if existing_data is None:
-            # TODO generate predictive_ID_unified - dont expect it to be in data
-            # db.session.add(PredictivePseudo(predictive_id=data["predictive_ID"], predictive_id_unified=data["predictive_ID_unified"], predictive_pseudo_id=data["predictive_pseudo_ID"]))
+            db.session.add(PredictivePseudo(predictive_id=data["predictive_ID"], predictive_id_unified=modify_predictive_number(data["predictive_ID_unified"]), predictive_pseudo_id=data["predictive_pseudo_ID"]))
             return jsonify(isError=False, message="Success", statusCode=200, data=data), 200
         else:
             return jsonify(isError=True, message="Data already in database", statusCode=409, data=data), 409
@@ -379,11 +408,11 @@ def post_new_predictive():
 @app.route("/api/sample", methods=["POST"])
 def post_new_sample():
     data = request.json
-    print(data, file=sys.stderr)
+    print(data)
     if data:
         existing_data = SamplePseudo.query.filter_by(sample_id=data["sample_ID"]).first()
         if existing_data is None:
-            # db.session.add(SamplePseudo(sample_id=data["sample_ID"], sample_pseudo_id=data["sample_pseudo_ID"]))
+            db.session.add(SamplePseudo(sample_id=data["sample_ID"], sample_pseudo_id=data["sample_pseudo_ID"]))
             return jsonify(isError=False, message="Success", statusCode=200, data=data), 200
         else:
             return jsonify(isError=True, message="Data already in database", statusCode=409, data=data), 409
@@ -397,7 +426,7 @@ def get_patient_by_patient_id(wanted_patient_id):
     if patient:
         return jsonify(patient.serialize)
     else:
-        return jsonify(None)
+        return jsonify(isError=True, message="Patient not found", statusCode=404), 404
 
 
 @app.route("/api/predictive/<wanted_predictive_id>", methods=["GET"])
@@ -406,7 +435,7 @@ def get_predictive_by_predictive_id(wanted_predictive_id):
     if predictive:
         return jsonify(predictive.serialize)
     else:
-        return jsonify(None)
+        return jsonify(isError=True, message="Predictive number not found", statusCode=404), 404
 
 
 @app.route("/api/sample/<wanted_sample_id>", methods=["GET"])
@@ -415,4 +444,4 @@ def get_sample_by_sample_id(wanted_sample_id):
     if sample:
         return jsonify(sample.serialize)
     else:
-        return jsonify(None)
+        return jsonify(isError=True, message="Sample not found", statusCode=404), 404

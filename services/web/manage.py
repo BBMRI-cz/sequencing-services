@@ -1,7 +1,7 @@
 from flask.cli import FlaskGroup
 import xml.etree.ElementTree as ET
 import os
-from project import app, db, PatientPseudo, PredictivePseudo, SamplePseudo
+from project import app, db, PatientPseudo, PredictivePseudo, SamplePseudo, modify_predictive_number
 import json
 import re
 
@@ -23,33 +23,6 @@ def _load_data_from_file(file_name, list_name):
     return data_list
 
 
-def _modify_predictive_number(pred_number):
-
-    # matching 2022-1234 ([whole_year]-[number])
-    if re.match(r"^20[1-2][\d]-[\d]{1,4}", pred_number):
-        year, id = pred_number.split("-", 1)
-        return f"{id}-{year[2:]}"
-
-    # matching 22-1234 ([year]-[number]) etc.
-    if re.match(r"^[1-2][\d]\-[\d]{1,4}", pred_number):
-        year, id = pred_number.split("-", 1)
-        return f"{id}-{year}"
-
-    # matching 1245-22 ([number]-[year]) etc.
-    if re.match(r"^[\d]{1,4}\-[1-2][\d]", pred_number):
-        return pred_number
-
-    # matching 22_1234 ([year]_[number]) etc.
-    if re.match(r"^[1-2][\d]_[\d]{1,4}", pred_number):
-        year, id = pred_number.split("_", 1)
-        return f"{id}-{year}"
-
-    # matching 2022_1234 ([whole_year]_[number])
-    if re.match(r"^20[1-2][\d]_[\d]{1,4}", pred_number):
-        year, id = pred_number.split("_", 1)
-        return f"{id}-{year[2:]}"
-
-    return pred_number
 
 
 @cli.command("fill_db")
@@ -63,7 +36,7 @@ def fill_db():
         db.session.add(PatientPseudo(patient["patient_ID"], patient["patient_pseudo_ID"]))
 
     for predictive in predictives:
-        db.session.add(PredictivePseudo(predictive["predictive_number"], _modify_predictive_number(predictive["predictive_number"]), predictive["pseudo_number"]))
+        db.session.add(PredictivePseudo(predictive["predictive_number"], modify_predictive_number(predictive["predictive_number"]), predictive["pseudo_number"]))
 
     for sample in samples:
         db.session.add(SamplePseudo(sample["sample_ID"], sample["pseudo_sample_ID"]))
