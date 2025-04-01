@@ -172,6 +172,9 @@ def find_file(file_we_look_for, path, year):
 
 
 def _replace_file_inside(file_name, text_to_replace, replaced_text):
+    if not os.path.exists(file_name):
+        return
+
     with open(file_name, "rb") as f:
         data = f.read()
 
@@ -181,6 +184,9 @@ def _replace_file_inside(file_name, text_to_replace, replaced_text):
 
 
 def _replace_file_inside_multiple(file_name, texts_to_replace, replaced_texts):
+    if not os.path.exists(file_name):
+        return
+
     with open(file_name, "r") as f:
         data = f.read()
 
