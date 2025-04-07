@@ -156,7 +156,7 @@ def find_file(file_we_look_for, path, year):
     for sequence_type in existing_sequence_types:
         match sequence_type:
             case "MiSEQ":
-                subdirs = ["complete-runs", "mamma-print"]
+                subdirs = ["complete-runs", "mamma-print", "missing-analysis"]
                 for subdir in subdirs:
                     path = os.path.join(full_year_path, "MiSEQ", subdir)
                     if os.path.exists(path):
