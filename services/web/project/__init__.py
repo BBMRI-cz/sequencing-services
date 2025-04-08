@@ -429,7 +429,7 @@ def post_new_sample():
     if data:
         existing_data = SamplePseudo.query.filter_by(sample_id=data["sample_ID"]).first()
         if existing_data is None:
-            db.session.add(SamplePseudo(sample_id=data["sample_ID"], sample_pseudo_id=data["sample_pseudo_ID"]))
+            db.session.add(SamplePseudo(sample_id=data["sample_ID"], sample_pseudo_id=data["pseudo_sample_ID"]))
             db.session.commit()
             return jsonify(isError=False, message="Success", statusCode=200, data=data), 200
         else:
