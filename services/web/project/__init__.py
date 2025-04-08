@@ -276,8 +276,12 @@ def retrieveSequences():
 @app.route("/transfering_file_run", methods=["POST"])
 def transfer_file_run():
     if request.method == 'POST':
-        final_path = "/".join(session["file_path"].split("/")[:6])
-        only_run = final_path.split("/")[-1]
+        file_path = session["file_path"]
+        path_parts = file_path.strip("/").split("/")
+
+        samples_index = path_parts.index("Samples")
+        final_path = "/" + "/".join(path_parts[:samples_index])
+        only_run = path_parts[samples_index - 1]
 
         samples_pseudo = os.listdir(os.path.join(final_path, "Samples"))
         samples_pred = [db.session.execute(db.Select(PredictivePseudo).filter_by(predictive_pseudo_id=pseudo)).one_or_none() for pseudo in samples_pseudo]
