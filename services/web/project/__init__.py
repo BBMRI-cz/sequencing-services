@@ -231,6 +231,7 @@ def _rename_whole_run(path, samples_pseudo, samples_pred):
     _replace_file_inside_multiple(os.path.join(path, "SampleSheet.csv"), samples_pseudo, samples_pred)
     for pseudo, pred in zip(samples_pseudo, samples_pred):
         _rename_files_recursively(pseudo, pred, os.path.join(path, "Samples"))
+        _rename_files_recursively(pseudo, pred, os.path.join(path, "FASTQ"))
 
 
 def threaded_copy(src, dest, pseudonym, pred_num, full_run):
