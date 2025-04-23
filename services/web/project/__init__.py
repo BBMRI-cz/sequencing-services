@@ -235,10 +235,24 @@ def _rename_whole_run(path, samples_pseudo, samples_pred):
 
 def threaded_copy(src, dest, pseudonym, pred_num, full_run):
     global FINISHED
-    shutil.copytree(src, dest)
     if full_run:
+        shutil.copytree(src, dest, ignore=shutil.ignore_patterns('FASTQ'))
+
+        # group all FASTQ files from Samples together into one FASTQ folder
+        dest_fastq = os.path.join(dest, 'FASTQ')
+        os.makedirs(dest_fastq, exist_ok=True)
+        samples_path = os.path.join(src, 'Samples')
+
+        for sample_dir in os.listdir(samples_path):
+            fastq_dir = os.path.join(samples_path, sample_dir, 'FASTQ')
+            if os.path.isdir(fastq_dir):
+                for filename in os.listdir(fastq_dir):
+                    src_file = os.path.join(fastq_dir, filename)
+                    dest_file = os.path.join(dest_fastq, filename)
+                    shutil.copy2(src_file, dest_file)
         _rename_whole_run(dest, pseudonym, pred_num)
     else:
+        shutil.copytree(src, dest)
         _rename_files_recursively(pseudonym, pred_num, dest)
     FINISHED = True
 
