@@ -139,38 +139,43 @@ def _look_if_pred_number_has_data(wanted_pred_number, db):
     return pseudonym
 
 
-def find_file(file_we_look_for, path, year):
-    full_year = f"{year}"
-    full_year_path = os.path.join(path, full_year)
-    if not os.path.exists(full_year_path):
-        return None
+def find_file(file_we_look_for, path):
+    year_pattern = re.compile(r'^(19|20)\d{2}$')
+    year_dirs = [
+        name for name in os.listdir(path)
+        if os.path.isdir(os.path.join(path, name)) and year_pattern.match(name)
+    ]
+    for year_dir in year_dirs:
+        full_year_path = os.path.join(path, year_dir)
+        if not os.path.exists(full_year_path):
+            return None
 
-    existing_sequence_types = [folder_sequence_type for folder_sequence_type in os.listdir(full_year_path)]
+        existing_sequence_types = [folder_sequence_type for folder_sequence_type in os.listdir(full_year_path)]
 
-    directories_with_runs = []
+        directories_with_runs = []
 
-    for sequence_type in existing_sequence_types:
-        match sequence_type:
-            case "MiSEQ":
-                subdirs = ["complete-runs", "mamma-print", "missing-analysis"]
-                for subdir in subdirs:
-                    path = os.path.join(full_year_path, "MiSEQ", subdir)
+        for sequence_type in existing_sequence_types:
+            match sequence_type:
+                case "MiSEQ":
+                    subdirs = ["complete-runs", "mamma-print", "missing-analysis"]
+                    for subdir in subdirs:
+                        path = os.path.join(full_year_path, "MiSEQ", subdir)
+                        if os.path.exists(path):
+                            directories_with_runs.append(path)
+                case "NextSeq":
+                    path = os.path.join(full_year_path, "NextSeq")
                     if os.path.exists(path):
                         directories_with_runs.append(path)
-            case "NextSeq":
-                path = os.path.join(full_year_path, "NextSeq")
-                if os.path.exists(path):
-                    directories_with_runs.append(path)
-            case _:
-                continue  # Skip any sequence_type that is not MiSEQ or NextSeq
+                case _:
+                    continue  # Skip any sequence_type that is not MiSEQ or NextSeq
 
-    for directory_with_runs in directories_with_runs:
-        for run in os.listdir(directory_with_runs):
-            sample_dir = os.path.join(directory_with_runs, run, "Samples")
-            if os.path.exists(sample_dir):
-                for sample in os.listdir(sample_dir):
-                    if sample == file_we_look_for:
-                        return os.path.join(sample_dir, sample)
+        for directory_with_runs in directories_with_runs:
+            for run in os.listdir(directory_with_runs):
+                sample_dir = os.path.join(directory_with_runs, run, "Samples")
+                if os.path.exists(sample_dir):
+                    for sample in os.listdir(sample_dir):
+                        if sample == file_we_look_for:
+                            return os.path.join(sample_dir, sample)
 
     return None
 
