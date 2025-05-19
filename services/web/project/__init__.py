@@ -147,8 +147,6 @@ def find_file(file_we_look_for, path):
     ]
     for year_dir in year_dirs:
         full_year_path = os.path.join(path, year_dir)
-        if not os.path.exists(full_year_path):
-            return None
 
         existing_sequence_types = [folder_sequence_type for folder_sequence_type in os.listdir(full_year_path)]
 
@@ -159,13 +157,13 @@ def find_file(file_we_look_for, path):
                 case "MiSEQ":
                     subdirs = ["complete-runs", "mamma-print", "missing-analysis"]
                     for subdir in subdirs:
-                        path = os.path.join(full_year_path, "MiSEQ", subdir)
-                        if os.path.exists(path):
-                            directories_with_runs.append(path)
+                        miseq_path = os.path.join(full_year_path, "MiSEQ", subdir)
+                        if os.path.exists(miseq_path):
+                            directories_with_runs.append(miseq_path)
                 case "NextSeq":
-                    path = os.path.join(full_year_path, "NextSeq")
-                    if os.path.exists(path):
-                        directories_with_runs.append(path)
+                    nextseq_path = os.path.join(full_year_path, "NextSeq")
+                    if os.path.exists(nextseq_path):
+                        directories_with_runs.append(nextseq_path)
                 case _:
                     continue  # Skip any sequence_type that is not MiSEQ or NextSeq
 
