@@ -279,7 +279,6 @@ def retrieveSequences():
         if pseudonym is None:
             return render_template("index-no-pred-number.html", pred_num=request.form["pred_number"])
         else:
-            year = request.form["pred_number"].split("_")[0]
             path_to_file = find_file(pseudonym[0].predictive_pseudo_id, "/RUNS")
             session["file_path"] = path_to_file
             session["pseudonym"] = pseudonym[0].predictive_pseudo_id
