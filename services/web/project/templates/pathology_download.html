@@ -1,0 +1,60 @@
+<h2>Download only patient sample:</h2>
+<button id="sampleBtn">Single Sample</button>
+
+<h2>Download whole run:</h2>
+<button id="runBtn">Whole Run</button>
+
+<p id="jobStatus"></p>
+
+<script>
+    const jobStatus = document.getElementById('jobStatus');
+
+    function startJob(buttonId, url) {
+        const button = document.getElementById(buttonId);
+
+        button.addEventListener('click', () => {
+            button.disabled = true;
+            jobStatus.textContent = 'Starting job...';
+
+            fetch(url, {
+                method: 'POST'
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to start job');
+                    return res.json();
+                })
+                .then(data => {
+                    if (!data.job_id) throw new Error('Missing job_id in response');
+                    if (!data.path) throw new Error('Missing path in response');
+
+                    const jobId = data.job_id;
+                    const path = data.path;
+
+                    jobStatus.textContent = `Data are currently being copied to path: ${path}. Be patient it may take several minutes.`;
+
+                    const evtSource = new EventSource(`/job-status/${jobId}`);
+
+                    evtSource.onmessage = function (event) {
+                        if (event.data === `Job ${jobId} finished`) {
+                            jobStatus.textContent = `Data copied successfully. They are available at path ${path}`;
+                            button.disabled = false;
+                            evtSource.close();
+                        }
+                    };
+
+                    evtSource.onerror = function () {
+                        jobStatus.textContent = 'Connection error';
+                        button.disabled = false;
+                        evtSource.close();
+                    };
+                })
+                .catch(err => {
+                    jobStatus.textContent = 'Error: ' + err.message;
+                    button.disabled = false;
+                });
+        });
+    }
+
+    startJob('sampleBtn', '/transfering_file_sample');
+    startJob('runBtn', '/transfering_file_run');
+</script>

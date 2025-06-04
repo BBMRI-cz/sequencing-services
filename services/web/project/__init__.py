@@ -1,17 +1,17 @@
 import re
+import threading
+import uuid
+from typing import Dict
 
 from flask import Flask, jsonify, Response, send_from_directory, request, render_template, session
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Enum
-import enum
 from werkzeug.utils import secure_filename
 import os
 import pandas as pd
 import shutil
 from threading import Thread
-import sys
 
-FINISHED = False
+job_events: Dict[str, threading.Event] = {}
 
 ALLOWED_EXTENSIONS = {'csv', 'xlsx'}
 
@@ -237,8 +237,7 @@ def _rename_whole_run(path, samples_pseudo, samples_pred):
         _rename_files_recursively(pseudo, pred, os.path.join(path, "FASTQ"))
 
 
-def threaded_copy(src, dest, pseudonym, pred_num, full_run):
-    global FINISHED
+def threaded_copy(src, dest, pseudonym, pred_num, full_run, job_id):
     if full_run:
         shutil.copytree(src, dest, ignore=shutil.ignore_patterns('FASTQ'))
 
@@ -258,7 +257,8 @@ def threaded_copy(src, dest, pseudonym, pred_num, full_run):
     else:
         shutil.copytree(src, dest)
         _rename_files_recursively(pseudonym, pred_num, dest)
-    FINISHED = True
+
+    job_events[job_id].set()
 
 
 @app.route("/")
@@ -281,64 +281,62 @@ def retrieveSequences():
             session["file_path"] = path_to_file
             session["pseudonym"] = pseudonym[0].predictive_pseudo_id
             session["pred_number"] = pseudonym[0].predictive_id
-            return render_template("index4.html", data={"pred_num": session["pred_number"], "pseudonym": pseudonym[0].predictive_pseudo_id, "path": path_to_file})
+            return render_template("pathology_download.html", data={"pred_num": session["pred_number"], "pseudonym": pseudonym[0].predictive_pseudo_id, "path": path_to_file})
     else:
-        return render_template("index3.html")
+        return render_template("pathology_search.html")
 
 
 @app.route("/transfering_file_run", methods=["POST"])
 def transfer_file_run():
-    if request.method == 'POST':
-        file_path = session["file_path"]
-        path_parts = file_path.strip("/").split("/")
+    file_path = session["file_path"]
+    path_parts = file_path.strip("/").split("/")
 
-        samples_index = path_parts.index("Samples")
-        final_path = "/" + "/".join(path_parts[:samples_index])
-        only_run = path_parts[samples_index - 1]
+    samples_index = path_parts.index("Samples")
+    final_path = "/" + "/".join(path_parts[:samples_index])
+    only_run = path_parts[samples_index - 1]
 
-        samples_pseudo = os.listdir(os.path.join(final_path, "Samples"))
-        samples_pred = [db.session.execute(db.Select(PredictivePseudo).filter_by(predictive_pseudo_id=pseudo)).one_or_none() for pseudo in samples_pseudo]
-        samples_pred = [pred[0].predictive_id for pred in samples_pred if pred is not None]
+    samples_pseudo = os.listdir(os.path.join(final_path, "Samples"))
+    samples_pred = [db.session.execute(db.Select(PredictivePseudo).filter_by(predictive_pseudo_id=pseudo)).one_or_none() for pseudo in samples_pseudo]
+    samples_pred = [pred[0].predictive_id for pred in samples_pred if pred is not None]
 
-        if os.path.exists(f"/RETRIEVED/{only_run}"):
-            return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{only_run}")
+    if os.path.exists(f"/RETRIEVED/{only_run}"):
+        return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{only_run}")
 
-        global FINISHED
-        FINISHED = False
-        thread = Thread(target=threaded_copy, args=(final_path, f"/RETRIEVED/{only_run}", samples_pseudo, samples_pred, True))
-        thread.daemon = True
-        thread.start()
-        return render_template("index5.html", data={"path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_run}", "coppied_full": False})
-    return render_template("index5.html")
+    job_id = str(uuid.uuid4())
+    event = threading.Event()
+    job_events[job_id] = event
+
+    thread = Thread(target=threaded_copy, args=(final_path, f"/RETRIEVED/{only_run}", samples_pseudo, samples_pred, True, job_id))
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({
+        "job_id": job_id,
+        "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_run}"
+    })
 
 
 @app.route("/transfering_file_sample", methods=["POST"])
 def transfer_file_sample():
-    if request.method == 'POST':
-        only_sample = session["file_path"].split("/")[-1]
-        if os.path.exists(f"/RETRIEVED/{only_sample}"):
-            return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{only_sample}")
+    only_sample = session["file_path"].split("/")[-1]
+    if os.path.exists(f"/RETRIEVED/{only_sample}"):
+        return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{only_sample}")
 
-        if os.path.exists(f"/RETRIEVED/{session['pred_number']}"):
-            return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{session['pred_number']}")
+    if os.path.exists(f"/RETRIEVED/{session['pred_number']}"):
+        return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{session['pred_number']}")
 
-        global FINISHED
-        FINISHED = False
-        thread = Thread(target=threaded_copy, args=(session["file_path"], f"/RETRIEVED/{only_sample}", session["pseudonym"], session["pred_number"], False))
-        thread.daemon = True
-        thread.start()
-        return render_template("index5.html", data={"path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_sample}", "coppied_full": False})
-    return render_template("index5.html")
+    job_id = str(uuid.uuid4())
+    event = threading.Event()
+    job_events[job_id] = event
 
+    thread = Thread(target=threaded_copy, args=(session["file_path"], f"/RETRIEVED/{only_sample}", session["pseudonym"], session["pred_number"], False, job_id))
+    thread.daemon = True
+    thread.start()
 
-@app.route("/data_copied")
-def data_copied():
-    return render_template("index6.html")
-
-
-@app.route("/copy_status")
-def copy_status():
-    return jsonify(dict(status=('finished' if FINISHED else 'running')))
+    return jsonify({
+        "job_id": job_id,
+        "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_sample}"
+    })
 
 
 #######################
@@ -361,8 +359,8 @@ def uploadFile():
         print("File saved!")
         session["upload_data_file_path"] = file_path
 
-        return render_template('index2.html')
-    return render_template("index.html")
+        return render_template('bbm_sequencing_success.html')
+    return render_template("bbm_sequencing_upload.html")
 
 
 @app.route('/bbm-sequencing-download')
@@ -480,3 +478,16 @@ def get_sample_by_sample_id(wanted_sample_id):
         return jsonify(sample.serialize)
     else:
         return jsonify(isError=True, message="Sample not found", statusCode=404), 404
+
+
+@app.route('/job-status/<job_id>')
+def job_status(job_id):
+    if job_id not in job_events:
+        return "Invalid job id", 400
+
+    def event_stream():
+        job_events[job_id].wait()
+        yield f'data: Job {job_id} finished\n\n'
+        del job_events[job_id]
+
+    return Response(event_stream(), mimetype='text/event-stream')
