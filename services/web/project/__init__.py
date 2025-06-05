@@ -2,6 +2,7 @@ import re
 import threading
 import uuid
 from typing import Dict
+import redis
 
 from flask import Flask, jsonify, Response, send_from_directory, request, render_template, session
 from flask_sqlalchemy import SQLAlchemy
@@ -10,6 +11,8 @@ import os
 import pandas as pd
 import shutil
 from threading import Thread
+
+redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
 
 job_events: Dict[str, threading.Event] = {}
 
@@ -258,7 +261,8 @@ def threaded_copy(src, dest, pseudonym, pred_num, full_run, job_id):
         shutil.copytree(src, dest)
         _rename_files_recursively(pseudonym, pred_num, dest)
 
-    job_events[job_id].set()
+    msg = f"Job {job_id} finished"
+    redis_client.publish(job_id, msg)
 
 
 @app.route("/")
@@ -300,17 +304,19 @@ def transfer_file_run():
     samples_pred = [pred[0].predictive_id for pred in samples_pred if pred is not None]
 
     if os.path.exists(f"/RETRIEVED/{only_run}"):
-        return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{only_run}")
+        return jsonify({
+            "status": "already_exists",
+            "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_run}"
+        })
 
     job_id = str(uuid.uuid4())
-    event = threading.Event()
-    job_events[job_id] = event
 
     thread = Thread(target=threaded_copy, args=(final_path, f"/RETRIEVED/{only_run}", samples_pseudo, samples_pred, True, job_id))
     thread.daemon = True
     thread.start()
 
     return jsonify({
+        "status": "started",
         "job_id": job_id,
         "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_run}"
     })
@@ -320,20 +326,25 @@ def transfer_file_run():
 def transfer_file_sample():
     only_sample = session["file_path"].split("/")[-1]
     if os.path.exists(f"/RETRIEVED/{only_sample}"):
-        return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{only_sample}")
+        return jsonify({
+            "status": "already_exists",
+            "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_sample}"
+        })
 
     if os.path.exists(f"/RETRIEVED/{session['pred_number']}"):
-        return render_template("index-already-retrieved.html", path=f"/RETRIEVED/{session['pred_number']}")
+        return jsonify({
+            "status": "already_exists",
+            "path": f"/NO-BACKUP-SPACE/RETRIEVED/{session['pred_number']}"
+        })
 
     job_id = str(uuid.uuid4())
-    event = threading.Event()
-    job_events[job_id] = event
 
     thread = Thread(target=threaded_copy, args=(session["file_path"], f"/RETRIEVED/{only_sample}", session["pseudonym"], session["pred_number"], False, job_id))
     thread.daemon = True
     thread.start()
 
     return jsonify({
+        "status": "started",
         "job_id": job_id,
         "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_sample}"
     })
@@ -482,12 +493,11 @@ def get_sample_by_sample_id(wanted_sample_id):
 
 @app.route('/job-status/<job_id>')
 def job_status(job_id):
-    if job_id not in job_events:
-        return "Invalid job id", 400
 
     def event_stream():
-        job_events[job_id].wait()
-        yield f'data: Job {job_id} finished\n\n'
-        del job_events[job_id]
-
+        pubsub = redis_client.pubsub()
+        pubsub.subscribe(job_id)
+        for message in pubsub.listen():
+            if message['type'] == 'message':
+                yield f"data: {message['data']}\n\n"
     return Response(event_stream(), mimetype='text/event-stream')

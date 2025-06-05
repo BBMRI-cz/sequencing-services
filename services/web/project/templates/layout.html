@@ -1,25 +1,25 @@
 <!DOCTYPE html>
 <head>
     <title>Retrieving sequencing data from SC</title>
-    {% block scripts %}
-    {% endblock scripts %}
-</head> 
+</head>
 <html>
-  <body>
-    <header>
-      <div class="container">
+<body>
+<header>
+    <div class="container">
         <h1 class="logo">MMCI Sequncing internal services</h1>
         <strong><nav>
-          <ul class="menu">
-            <li><a href="/bbm-sequencing-upload"><button>BBM Sequencing info</button></a></li>
-            <li><a href="/pathology-data-retrieval"><button>Pathology data retrieval</button></a></li>
-          </ul>
+            <ul class="menu">
+                <li><a href="/bbm-sequencing-upload"><button>BBM Sequencing info</button></a></li>
+                <li><a href="/pathology-data-retrieval"><button>Pathology data retrieval</button></a></li>
+            </ul>
         </nav></strong>
-      </div>
-    </header>
-    <div class="container">
-        {% block content %}
-        {% endblock content %}
-      </div>
-  </body>
+    </div>
+</header>
+<div class="container">
+    {% block content %}
+    {% endblock content %}
+</div>
+{% block scripts %}
+{% endblock scripts %}
+</body>
 </html>
