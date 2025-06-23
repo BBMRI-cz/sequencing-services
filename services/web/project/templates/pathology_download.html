@@ -1,12 +1,30 @@
 {% extends "layout.html" %}
 {% block content %}
     <h2>Retrieving sequencing data from SC</h2>
-    <p>Predictive number: {{data.pred_num}} -> Pseudonym: {{data.pseudonym}}</p>
-    <p>File found in:</p>
-    <p>{{data.path}}</p>
+    <p>Predictive number: {{ base_pred_num }}</p>
 
-    <h2>Download only patient sample:</h2>
-    <button id="sampleBtn">Single Sample</button>
+    <h3>Samples found:</h3>
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+        <tr style="background-color: #f9f9f9;">
+            <th style="text-align: left; padding: 8px;">Pseudonym</th>
+            <th style="text-align: left; padding: 8px;">Prediction #</th>
+            <th style="text-align: left; padding: 8px;">File Path</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for file in files %}
+            <tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding: 8px;">{{ file.pseudonym }}</td>
+                <td style="padding: 8px;">{{ file.pred_number }}</td>
+                <td style="padding: 8px; font-family: monospace;">{{ file.path }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Download all samples:</h2>
+    <button id="sampleBtn">Download Samples</button>
 
     <h2>Download whole run:</h2>
     <button id="runBtn">Whole Run</button>
@@ -32,26 +50,26 @@
                         return res.json();
                     })
                     .then(data => {
-                        const path = data.path;
+                        const paths = data.paths || [];
 
                         if (data.status === 'already_exists') {
-                            jobStatus.textContent = `Data are already present in path: ${path}`;
+                            jobStatus.textContent = `Data are already present in path: ${paths}`;
                             button.disabled = false;
                             return;
                         }
-                        if (data.status !== 'started' || !data.job_id || !data.path) {
-                            throw new Error('Unexpected response from server');
+                        if (data.status !== 'started' || !data.job_id) {
+                            throw new Error('Unexpected response from server')
                         }
 
                         const jobId = data.job_id;
 
-                        jobStatus.textContent = `Data are currently being copied to path: ${path}. Be patient it may take several minutes.`;
+                        jobStatus.textContent = `Data are currently being copied to path: ${paths}. Be patient it may take several minutes.`;
 
                         const evtSource = new EventSource(`/job-status/${jobId}`);
 
                         evtSource.onmessage = function (event) {
                             if (event.data === `Job ${jobId} finished`) {
-                                jobStatus.textContent = `Data copied successfully. They are available at path ${path}`;
+                                jobStatus.textContent = `Data copied successfully. They are available at path ${paths}`;
                                 button.disabled = false;
                                 evtSource.close();
                             }

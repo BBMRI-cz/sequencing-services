@@ -1,11 +1,25 @@
 version: '3.8'
 
 services:
+ celery:
+  build:
+   context: ./services/web
+   dockerfile: Dockerfile.prod
+  command: celery -A project.celery_app.celery worker --loglevel=debug
+  volumes:
+   - /home/export/pseudonymization_table/:/pseudo_tables/
+   - /seq/NO-BACKUP-SPACE/RETRIEVED/:/RETRIEVED/
+   - /muni-ss/OrganisedRuns/:/RUNS/
+  depends_on:
+   - redis
+   - db
+  env_file:
+   - ./.env.prod
  web:
   build:
    context: ./services/web
    dockerfile: Dockerfile.prod
-  command: gunicorn --bind 0.0.0.0:5001 manage:app -w 4 --access-logfile - --error-logfile -
+  command: gunicorn --worker-class gevent --bind 0.0.0.0:5001 manage:app -w 4 --access-logfile - --error-logfile -
   volumes:
    - /home/export/pseudonymization_table/:/pseudo_tables/
    - /seq/NO-BACKUP-SPACE/RETRIEVED/:/RETRIEVED/

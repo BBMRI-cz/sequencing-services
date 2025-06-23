@@ -1,20 +1,15 @@
 import re
-import threading
 import uuid
-from typing import Dict
-import redis
+from typing import Dict, List, Any
 
-from flask import Flask, jsonify, Response, send_from_directory, request, render_template, session
-from flask_sqlalchemy import SQLAlchemy
+from flask import jsonify, Response, send_from_directory, request, render_template, session
 from werkzeug.utils import secure_filename
 import os
 import pandas as pd
-import shutil
-from threading import Thread
-
-redis_client = redis.Redis(host='redis', port=6379, db=0, decode_responses=True)
-
-job_events: Dict[str, threading.Event] = {}
+from .app import db, app
+from .tasks import copy_multiple_samples_task, copy_multiple_runs_task
+from .redis_client import redis_client
+from .utils import threaded_copy
 
 ALLOWED_EXTENSIONS = {'csv', 'xlsx'}
 
@@ -24,12 +19,6 @@ BBM_parts = {
     "b": ["7", "PR"],
     "d": ["gD", "PK"]
 }
-
-app = Flask(__name__)
-app.config.from_object("project.config.Config")
-db = SQLAlchemy(app)
-
-app.secret_key = "Secret BBM sequecing key"
 
 
 class PatientPseudo(db.Model):
@@ -131,15 +120,29 @@ def _add_sample_id_to_excel(df, type_of_df):
     return df
 
 
-def _check_if_sample_has_sequencing(df, db):
+def _check_if_sample_has_sequencing(df):
     has_seq = [db.session.execute(db.Select(SamplePseudo).filter_by(sample_id=sample_id)).one_or_none() is not None for sample_id in df["sample_id"].tolist()]
     df["has sequencing"] = has_seq
     return df
 
 
-def _look_if_pred_number_has_data(wanted_pred_number, db):
-    pseudonym = db.session.execute(db.Select(PredictivePseudo).filter_by(predictive_id_unified=wanted_pred_number)).one_or_none()
-    return pseudonym
+def _look_if_pred_number_has_data(wanted_pred_number_base: str) -> List[PredictivePseudo]:
+    target_ids = [
+        wanted_pred_number_base,
+        f"{wanted_pred_number_base}_RNA",
+        f"{wanted_pred_number_base}_DNA"
+    ]
+    pseudonyms = (
+        db.session
+        .execute(
+            db.select(PredictivePseudo).filter(
+                PredictivePseudo.predictive_id_unified.in_(target_ids)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return pseudonyms
 
 
 def find_file(file_we_look_for, path):
@@ -181,90 +184,6 @@ def find_file(file_we_look_for, path):
     return None
 
 
-def _replace_file_inside(file_name, text_to_replace, replaced_text):
-    if not os.path.exists(file_name):
-        return
-
-    with open(file_name, "rb") as f:
-        data = f.read()
-
-    with open(file_name, "wb") as f:
-        data = data.replace(str.encode(text_to_replace), str.encode(replaced_text))
-        f.write(data)
-
-
-def _replace_file_inside_multiple(file_name, texts_to_replace, replaced_texts):
-    if not os.path.exists(file_name):
-        return
-
-    with open(file_name, "r") as f:
-        data = f.read()
-
-    for rep, new in zip(texts_to_replace, replaced_texts):
-        data = data.replace(rep, new)
-
-    with open(file_name, "w") as f:
-        f.write(data)
-
-
-def _rename_files_recursively(text_to_replace, replaced_text, current_file):
-    """Recursively renames all files ina run that contain predictive number with
-    pseudonymized predictive number. Does it in a way to not create conflicts in a renaming
-
-    Parameters
-    ----------
-    text_to_replace : str
-        Text that should be replaced in a file name
-    replaced_text : str
-        Text that will replace "text_to_replace" in a file name
-    current_file : str
-        Path of a current directory that will be renamed and then listed to rename inner file
-    """
-    current_file_renamed = current_file.replace(text_to_replace, replaced_text, 1)
-    os.rename(current_file, current_file_renamed)
-    for file in os.listdir(current_file_renamed):
-        file_path = os.path.join(current_file_renamed, file)
-        if os.path.isdir(file_path):
-            _rename_files_recursively(text_to_replace, replaced_text, file_path)
-        else:
-            if "_StatInfo" in file:
-                _replace_file_inside(os.path.join(current_file_renamed, file), text_to_replace, replaced_text)
-            os.rename(os.path.join(current_file_renamed, file), os.path.join(current_file_renamed, file.replace(text_to_replace, replaced_text)))
-
-
-def _rename_whole_run(path, samples_pseudo, samples_pred):
-    _replace_file_inside_multiple(os.path.join(path, "Alignment", "AdapterCounts.txt"), samples_pseudo, samples_pred)
-    _replace_file_inside_multiple(os.path.join(path, "SampleSheet.csv"), samples_pseudo, samples_pred)
-    for pseudo, pred in zip(samples_pseudo, samples_pred):
-        _rename_files_recursively(pseudo, pred, os.path.join(path, "Samples"))
-        _rename_files_recursively(pseudo, pred, os.path.join(path, "FASTQ"))
-
-
-def threaded_copy(src, dest, pseudonym, pred_num, full_run, job_id):
-    if full_run:
-        shutil.copytree(src, dest, ignore=shutil.ignore_patterns('FASTQ'))
-
-        # group all FASTQ files from Samples together into one FASTQ folder
-        dest_fastq = os.path.join(dest, 'FASTQ')
-        os.makedirs(dest_fastq, exist_ok=True)
-        samples_path = os.path.join(src, 'Samples')
-
-        for sample_dir in os.listdir(samples_path):
-            fastq_dir = os.path.join(samples_path, sample_dir, 'FASTQ')
-            if os.path.isdir(fastq_dir):
-                for filename in os.listdir(fastq_dir):
-                    src_file = os.path.join(fastq_dir, filename)
-                    dest_file = os.path.join(dest_fastq, filename)
-                    shutil.copy2(src_file, dest_file)
-        _rename_whole_run(dest, pseudonym, pred_num)
-    else:
-        shutil.copytree(src, dest)
-        _rename_files_recursively(pseudonym, pred_num, dest)
-
-    msg = f"Job {job_id} finished"
-    redis_client.publish(job_id, msg)
-
-
 @app.route("/")
 def main():
     return render_template("main.html")
@@ -277,76 +196,92 @@ def main():
 @app.route("/pathology-data-retrieval", methods=["GET", "POST"])
 def retrieveSequences():
     if request.method == 'POST':
-        pseudonym = _look_if_pred_number_has_data(request.form["pred_number"], db)
-        if pseudonym is None:
+        base_pred_num = request.form["pred_number"]
+        pseudonyms = _look_if_pred_number_has_data(base_pred_num)
+        if not pseudonyms:
             return render_template("index-no-pred-number.html", pred_num=request.form["pred_number"])
-        else:
-            path_to_file = find_file(pseudonym[0].predictive_pseudo_id, "/RUNS")
-            session["file_path"] = path_to_file
-            session["pseudonym"] = pseudonym[0].predictive_pseudo_id
-            session["pred_number"] = pseudonym[0].predictive_id
-            return render_template("pathology_download.html", data={"pred_num": session["pred_number"], "pseudonym": pseudonym[0].predictive_pseudo_id, "path": path_to_file})
+
+        files = []
+        for pseudo in pseudonyms:
+            path_to_file = find_file(pseudo.predictive_pseudo_id, "/RUNS")
+            files.append({
+                "pseudonym": pseudo.predictive_pseudo_id,
+                "pred_number": pseudo.predictive_id_unified,
+                "path": path_to_file
+            })
+
+        session["files"] = files
+        session["base_pred_num"] = base_pred_num
+
+        return render_template("pathology_download.html",
+                               base_pred_num=base_pred_num,
+                               files=files)
     else:
         return render_template("pathology_search.html")
 
 
 @app.route("/transfering_file_run", methods=["POST"])
 def transfer_file_run():
-    file_path = session["file_path"]
-    path_parts = file_path.strip("/").split("/")
+    files = session.get("files", [])
+    runs_data: Dict[str, Dict[str, Any]] = {}
+    for f in files:
+        parts = f["path"].strip("/").split("/")
+        if "Samples" in parts:
+            idx = parts.index("Samples")
+            run_path = "/" + "/".join(parts[:idx])  # Path up to the run
+            only_run = parts[idx - 1]
+            runs_data[only_run] = {"run_path": run_path}
 
-    samples_index = path_parts.index("Samples")
-    final_path = "/" + "/".join(path_parts[:samples_index])
-    only_run = path_parts[samples_index - 1]
+    missing_runs = {only_run: data for only_run, data in runs_data.items() if not os.path.exists(f"/RETRIEVED/{only_run}")}
 
-    samples_pseudo = os.listdir(os.path.join(final_path, "Samples"))
-    samples_pred = [db.session.execute(db.Select(PredictivePseudo).filter_by(predictive_pseudo_id=pseudo)).one_or_none() for pseudo in samples_pseudo]
-    samples_pred = [pred[0].predictive_id for pred in samples_pred if pred is not None]
-
-    if os.path.exists(f"/RETRIEVED/{only_run}"):
+    if not missing_runs:
         return jsonify({
             "status": "already_exists",
-            "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_run}"
+            "paths": [f"/NO-BACKUP-SPACE/RETRIEVED/{only_run}" for only_run in runs_data.keys()]
         })
+
+    for only_run, data in missing_runs.items():
+        run_path = data["run_path"]
+        samples_pseudo = os.listdir(os.path.join(run_path, "Samples"))
+        samples_pred_raw = [
+            db.session.execute(db.Select(PredictivePseudo).filter_by(predictive_pseudo_id=pseudo)).one_or_none()
+            for pseudo in samples_pseudo
+        ]
+        samples_pred = [pred[0].predictive_id for pred in samples_pred_raw if pred is not None]
+
+        data["samples_pseudo"] = samples_pseudo
+        data["samples_pred"] = samples_pred
 
     job_id = str(uuid.uuid4())
 
-    thread = Thread(target=threaded_copy, args=(final_path, f"/RETRIEVED/{only_run}", samples_pseudo, samples_pred, True, job_id))
-    thread.daemon = True
-    thread.start()
+    copy_multiple_runs_task.delay(missing_runs, job_id)
 
     return jsonify({
         "status": "started",
         "job_id": job_id,
-        "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_run}"
+        "paths": [f"/NO-BACKUP-SPACE/RETRIEVED/{only_run}" for only_run in missing_runs.keys()]
     })
 
 
 @app.route("/transfering_file_sample", methods=["POST"])
 def transfer_file_sample():
-    only_sample = session["file_path"].split("/")[-1]
-    if os.path.exists(f"/RETRIEVED/{only_sample}"):
-        return jsonify({
-            "status": "already_exists",
-            "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_sample}"
-        })
+    files = session.get("files", [])
+    missing_samples = [file for file in files if not os.path.exists(f"/RETRIEVED/{file['pred_number']}")]
 
-    if os.path.exists(f"/RETRIEVED/{session['pred_number']}"):
+    if not missing_samples:
         return jsonify({
             "status": "already_exists",
-            "path": f"/NO-BACKUP-SPACE/RETRIEVED/{session['pred_number']}"
+            "paths": [f"/NO-BACKUP-SPACE/RETRIEVED/{file['pseudonym']}" for file in files]
         })
 
     job_id = str(uuid.uuid4())
 
-    thread = Thread(target=threaded_copy, args=(session["file_path"], f"/RETRIEVED/{only_sample}", session["pseudonym"], session["pred_number"], False, job_id))
-    thread.daemon = True
-    thread.start()
+    copy_multiple_samples_task.delay(missing_samples, job_id)
 
     return jsonify({
         "status": "started",
         "job_id": job_id,
-        "path": f"/NO-BACKUP-SPACE/RETRIEVED/{only_sample}"
+        "paths": [f"/NO-BACKUP-SPACE/RETRIEVED/{f['pseudonym']}" for f in missing_samples]
     })
 
 
