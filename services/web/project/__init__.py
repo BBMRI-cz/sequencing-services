@@ -436,3 +436,8 @@ def job_status(job_id):
             if message['type'] == 'message':
                 yield f"data: {message['data']}\n\n"
     return Response(event_stream(), mimetype='text/event-stream')
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify(status="ok"), 200
