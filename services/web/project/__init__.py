@@ -130,7 +130,18 @@ def _look_if_pred_number_has_data(wanted_pred_number_base: str) -> List[Predicti
     target_ids = [
         wanted_pred_number_base,
         f"{wanted_pred_number_base}_RNA",
-        f"{wanted_pred_number_base}_DNA"
+        f"{wanted_pred_number_base}_DNA",
+
+        f"{wanted_pred_number_base}A",
+        f"{wanted_pred_number_base}B",
+        f"{wanted_pred_number_base}_A",
+        f"{wanted_pred_number_base}_B",
+        f"{wanted_pred_number_base}I",
+        f"{wanted_pred_number_base}II",
+        f"{wanted_pred_number_base}_I",
+        f"{wanted_pred_number_base}_II",
+        f"{wanted_pred_number_base}r",
+        f"{wanted_pred_number_base}_r",
     ]
     pseudonyms = (
         db.session

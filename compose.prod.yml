@@ -9,7 +9,7 @@ services:
   volumes:
    - /home/export/pseudonymization_table/:/pseudo_tables/
    - /seq/NO-BACKUP-SPACE/RETRIEVED/:/RETRIEVED/
-   - /muni-ss/OrganisedRuns/:/RUNS/
+   - /muni-sc/OrganisedRuns/:/RUNS/
   depends_on:
    - redis
    - db
