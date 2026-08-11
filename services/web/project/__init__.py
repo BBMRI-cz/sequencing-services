@@ -328,7 +328,7 @@ def downloadData():
         uploaded_df = pd.read_csv(data_file_path, sep=",")
         print(uploaded_df.columns)
         df = _add_sample_id_to_excel(uploaded_df, "csv")
-        df = _check_if_sample_has_sequencing(df, db)
+        df = _check_if_sample_has_sequencing(df)
         download_file_name = "bbm_data_with_sequecing_info.csv"
         df_path = os.path.join(app.config["DOWNLOAD_FOLDER"], download_file_name)
         df.to_csv(df_path, sep=";", index=False)
@@ -337,7 +337,7 @@ def downloadData():
         uploaded_df = pd.read_excel(data_file_path, sheet_name="List1", engine="openpyxl")
         print(uploaded_df.columns)
         df = _add_sample_id_to_excel(uploaded_df, "xlsx")
-        df = _check_if_sample_has_sequencing(df, db)
+        df = _check_if_sample_has_sequencing(df)
         download_file_name = "bbm_data_with_sequecing_info.xlsx"
         df_path = os.path.join(app.config["DOWNLOAD_FOLDER"], download_file_name)
         df.to_excel(df_path, sheet_name="List1", index=False)
