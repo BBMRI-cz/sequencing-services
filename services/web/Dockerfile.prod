@@ -12,8 +12,11 @@ WORKDIR /usr/src/app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc
+# ponytail: no gcc — every requirement ships a cp311 manylinux wheel, so nothing
+# is compiled from source here. Debian buster is EOL and its apt repos are gone,
+# so installing it is no longer possible anyway. If a future dependency has no
+# wheel, `pip wheel` will fail loudly at build time: move to a supported base
+# image (python:3.11-slim-bookworm) rather than reinstating apt on buster.
 
 # install dependencies
 RUN pip install --upgrade pip
@@ -38,7 +41,9 @@ ENV APP_HOME=/home/app/web
 RUN mkdir $APP_HOME
 WORKDIR $APP_HOME
 
-RUN apt-get update && apt-get install -y --no-install-recommends netcat
+# ponytail: no netcat — entrypoint.sh waits for postgres with the stdlib socket
+# module instead, which is already in the image. Same reason as above: buster's
+# apt repos are gone, and the package was renamed netcat-openbsd after buster.
 COPY --from=builder  /usr/src/app/wheels /wheels
 COPY --from=builder /usr/src/app/requirements.txt .
 

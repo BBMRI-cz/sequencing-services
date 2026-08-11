@@ -4,7 +4,11 @@ if [ "$DATABASE" = "postgres" ] && [ "$FLASK_DEBUG" = "0" ]
 then
     echo "Waiting for postgres..."
 
-    while ! nc -z $SQL_HOST $SQL_PORT; do
+    while ! python -c 'import socket, sys
+try:
+    socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=2).close()
+except OSError:
+    sys.exit(1)' "$SQL_HOST" "$SQL_PORT"; do
       sleep 0.1
     done
 
